@@ -13,6 +13,10 @@
     - name: "proxy_https"
       prompt: "Proxy https"
 
+  environment:
+    http_proxy: "{{proxy_http}}"
+    https_proxy: "{{proxy_https}}"
+
   tasks:
 
     #- name: Instalando dependência para o Docker
@@ -23,9 +27,6 @@
     - name: Instalando Docker
       yum:
         name: python-setuptools,docker
-        environment: 
-          http_proxy: {{proxy_http}}
-          https_proxy: {{proxy_https}}
         state: present
 
     - name: Cria diretorio config do docker
