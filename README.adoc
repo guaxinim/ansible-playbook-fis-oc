@@ -1,0 +1,25 @@
+# Ansible Playbook for FIS with Openshift oc cluster up
+
+## Preparação
+
+1 - Instalar o Ansible:  +  
+
+### RHEL / CentOS
+
+----
+wget http://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+rpm -ivh epel-release-latest-7.noarch.rpm
+yum repolist
+yum install ansible
+----
+
+
+## Execução (rodar com usuário com permissão de root)
+
+----
+git clone https://github.com/guaxinim/ansible-playbook-fis-oc
+cp /ansible-playbook-fis-oc/* ~
+cd ~
+ansible-playbook playbook-fuse-openshift.yml -i hosts --ask-become-pass
+----
+
