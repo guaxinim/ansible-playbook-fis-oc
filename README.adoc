@@ -15,7 +15,7 @@ yum install ansible
 
 ----
 git clone https://github.com/guaxinim/ansible-playbook-fis-oc
-cp /ansible-playbook-fis-oc/* ~
+cp -r ansible-playbook-fis-oc/* ~
 cd ~
 ansible-playbook playbook-fuse-openshift.yml -i hosts --ask-become-pass
 ----
