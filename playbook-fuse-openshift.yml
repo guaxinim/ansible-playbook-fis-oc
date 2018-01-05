@@ -1,6 +1,6 @@
 ---
 - hosts: localhost
-  name: "Instalação da rota no FIS do TSE no Openshift"
+  name: "Instalação da rota no FIS no Openshift"
   become: true
   connection: local
 
@@ -18,11 +18,6 @@
     https_proxy: "{{proxy_https}}"
 
   tasks:
-
-    #- name: Instalando dependência para o Docker
-    #  yum:
-    #    name: python-setuptools
-    #    state: present
 
     - name: Instalando Docker
       yum:
@@ -66,55 +61,56 @@
         daemon_reload: yes
         name: docker
 
+    - name: Verifica diretorio
+      shell: pwd
+      register: pwd
+
+    # setenforce 0
+    # firewall-cmd --zone=public --add-port=8443/tcp --permanent
+    # firewall-cmd --reload
+
+    - stat:
+        path: "{{pwd.stdout}}/oc"
+      register: binario
+
+    - name: Download do utilitario oc (Openshift)
+      unarchive:
+        src: https://github.com/openshift/origin/releases/download/v3.7.0/openshift-origin-server-v3.7.0-7ed6862-linux-64bit.tar.gz
+        dest: "{{pwd.stdout}}"
+        remote_src: yes
+      when: binario.stat.size == 0
+
+    - copy:
+        src: openshift-origin-server-v3.7.0-7ed6862-linux-64bit/oc
+        dest: "{{pwd.stdout}}/oc"
+      when: binario.stat.size == 0
+
+    - name: Para o cluster se estiver ativo
+      command: ./oc cluster down tse
+      ignore_errors: yes
+
+    - name: Limpa configuracao
+      file: path=openshift-dir state=absent
+
     - name: Cria diretorio openshift
-      file: path=/home/{{ansible_ssh_user}}/openshift-dir state=directory
+      file: path=openshift-dir state=directory
 
-    # Copia utilitario oc
-    #- copy:
-    #    src: oc-3.7.9-linux.tar.gz
-    #    dest: /home/{{ansible_ssh_user}}/oc-3.7.9-linux.tar.gz
-    #    owner: '{{ansible_ssh_user}}'
-    #    group: '{{ansible_ssh_user}}'
-    #    mode: u+rwx,g-rx,o-rx
-
-    - name: Cria diretorio openshift
-      file: path=/home/{{ansible_ssh_user}}/dump state=directory
-
-    # Copia o dump do mysql
-    #- copy:
-    #    src: mysql-dump.sql
-    #    dest: /home/{{ansible_ssh_user}}/dump/mysql-dump.sql
-    #    owner: '{{ansible_ssh_user}}'
-    #    group: '{{ansible_ssh_user}}'
-    #    mode: u+rw,g-rw,o-rw
-
-    #- name: Extraindo oc
-    #  unarchive:
-    #    src: /home/{{ansible_ssh_user}}/oc-3.7.9-linux.tar.gz
-    #    dest: /home/{{ansible_ssh_user}}
-    #    remote_src: yes
-
-    #setenforce 0
-    #firewall-cmd --zone=public --add-port=8443/tcp --permanent
-    #firewall-cmd --reload
-
-#    - name: Inicia openshift cluster-up
-#      command: /home/{{ansible_ssh_user}}/oc cluster up tse --version=v3.6.173.0.5 --public-hostname='{{ansible_default_ipv4.address}}' --use-existing-config --host-data-dir='/home/{{ansible_ssh_user}}/openshift-dir' --host-pv-dir='/home/{{ansible_ssh_user}}/openshift-dir'
-
-    # oc com proxy
     - name: Inicia openshift cluster-up
-      command: /home/{{ansible_ssh_user}}/oc cluster up tse --version=v3.6.173.0.5 --http-proxy='{{proxy_http}}' --https-proxy='{{proxy_https}}' --public-hostname='hostvars[inventory_hostname]['ansible_default_ipv4']['address']' --use-existing-config --host-data-dir='/home/{{ansible_ssh_user}}/openshift-dir' --host-pv-dir='/home/{{ansible_ssh_user}}/openshift-dir'
+      command: ./oc cluster up tse --version=v3.6.173.0.5 --public-hostname='{{ansible_default_ipv4.address}}' --use-existing-config --host-data-dir='{{pwd.stdout}}/openshift-dir' --host-pv-dir='{{pwd.stdout}}/openshift-dir'
+      when: http_proxy is undefined
+
+    - name: Inicia openshift cluster-up (com proxy)
+      command: ./oc cluster up tse --version=v3.6.173.0.5 --http-proxy='{{proxy_http}}' --https-proxy='{{proxy_https}}' --public-hostname='hostvars[inventory_hostname]['ansible_default_ipv4']['address']' --use-existing-config --host-data-dir='{{pwd.stdout}}/openshift-dir' --host-pv-dir='{{pwd.stdout}}/openshift-dir'
+      when: http_proxy is defined
 
     - name: Openshift login com o usuário de sistema
-      shell: /home/{{ansible_ssh_user}}/oc login https://{{ansible_default_ipv4.address}}:8443 -u system:admin
-
-    #- pause:
+      shell: ./oc login https://{{ansible_default_ipv4.address}}:8443 -u system:admin
 
     - name: Importando imagem Mysql
-      shell: /home/{{ansible_ssh_user}}/oc import-image my-rhscl/mysql-57-rhel7 --from=registry.access.redhat.com/rhscl/mysql-57-rhel7 --confirm -n openshift || echo "Imagem ja existe"
+      shell: ./oc import-image my-rhscl/mysql-57-rhel7 --from=registry.access.redhat.com/rhscl/mysql-57-rhel7 --confirm -n openshift || echo "Imagem ja existe"
 
     - name: Importando imagem do Fuse Integration Services
-      shell: /home/{{ansible_ssh_user}}/oc import-image my-jboss-fuse-6/fis-java-openshift --from=registry.access.redhat.com/jboss-fuse-6/fis-java-openshift --confirm -n openshift || echo "Imagem ja existe!"
+      shell: ./oc import-image my-jboss-fuse-6/fis-java-openshift --from=registry.access.redhat.com/jboss-fuse-6/fis-java-openshift --confirm -n openshift || echo "Imagem ja existe!"
 
     #- name: Baixando imagem do Mysql
     #  shell: docker pull registry.access.redhat.com/rhscl/mysql-57-rhel7
@@ -123,34 +119,33 @@
     #  shell: docker pull registry.access.redhat.com/jboss-fuse-6/fis-java-openshift
 
     - name: Openshift login com usuário admin
-      shell: /home/{{ansible_ssh_user}}/oc login https://{{ansible_default_ipv4.address}}:8443 -u admin -p admin
+      shell: ./oc login https://{{ansible_default_ipv4.address}}:8443 -u admin -p admin
 
     - name: Criando projeto fuse-tse
-      shell: /home/{{ansible_ssh_user}}/oc new-project fuse-tse --display-name='TSE Fuse Plano Saude' || echo "Projeto ja existe!"
+      shell: ./oc new-project fuse-tse --display-name='TSE Fuse Plano Saude' || echo "Projeto ja existe!"
 
     - name: Criando container Mysql
-      shell: /home/{{ansible_ssh_user}}/oc new-app -e MYSQL_USER=admin -e MYSQL_PASSWORD=redhat@123 -e MYSQL_DATABASE=srh2 -e MYSQL_ROOT_PASSWORD=redhat@123 --image-stream="openshift/mysql:5.7" --allow-missing-imagestream-tags || echo "Container ja existe"
+      shell: ./oc new-app -e MYSQL_USER=admin -e MYSQL_PASSWORD=redhat@123 -e MYSQL_DATABASE=srh2 -e MYSQL_ROOT_PASSWORD=redhat@123 --image-stream="openshift/mysql:5.7" --allow-missing-imagestream-tags || echo "Container ja existe"
 
     - name: Buscando container mysql
-      shell: /home/{{ansible_ssh_user}}/oc get po --no-headers | grep mysql | grep -v 'deploy' | cut -f1 -d ' '
+      shell: ./oc get po --no-headers | grep mysql | grep -v 'deploy' | cut -f1 -d ' '
       register: mysql_container
       until: mysql_container.stdout.find("mysql") != -1
       retries: 30
       delay: 20
 
     - name: Enviando o dump para dentro do container
-    # shell: /home/{{ansible_ssh_user}}/oc cp ./dump/mysql-dump.sql {{mysql_container.stdout}}:/tmp/mysql-dump.sql || echo "Nao iniciado"
-      shell: /home/{{ansible_ssh_user}}/oc exec -i {{mysql_container.stdout}} -- /opt/rh/rh-mysql57/root/usr/bin/mysql -uroot srh2  < dump/mysql-dump.sql || echo "Nao iniciado"
+      shell: ./oc exec -i {{mysql_container.stdout}} -- /opt/rh/rh-mysql57/root/usr/bin/mysql -uroot srh2  < dump/mysql-dump.sql || echo "Nao iniciado"
       register: sql_dump
       until: sql_dump.stdout.find("iniciado") == -1
       retries: 30
       delay: 20
 
     - name: Criando secret
-      shell: /home/{{ansible_ssh_user}}/oc secrets new-basicauth elvis-secret --username=elvis-redhat --password=redhat@123 || echo "Erro ao criar secret"
+      shell: ./oc secrets new-basicauth elvis-secret --username=elvis-redhat --password=redhat@123 || echo "Erro ao criar secret"
 
     - name: Adicionando secret
-      shell: /home/{{ansible_ssh_user}}/oc secrets add serviceaccount/builder secrets/elvis-secret || echo "Erro ao adicionar secret"
+      shell: ./oc secrets add serviceaccount/builder secrets/elvis-secret || echo "Erro ao adicionar secret"
 
     #- name: Executando build da aplicação
     #  shell: /home/{{ansible_ssh_user}}/oc new-build fis-java-openshift~https://elvis-redhat@bitbucket.org/elvis-redhat/tse-fuse.git --build-secret elvis-secret || echo "Erro ao criar build"
@@ -159,7 +154,7 @@
     # shell: /home/{{ansible_ssh_user}}/oc exec {{mysql_container.stdout}} -- /opt/rh/rh-mysql57/root/usr/bin/mysql --user=root srh2  < /tmp/mysql-dump.sql || echo "Nao iniciado"
 
     - name: Executando build do projeto fuse 
-      shell: /home/{{ansible_ssh_user}}/oc new-app fis-java-openshift~https://bitbucket.org/elvis-redhat/tse-fuse.git --source-secret elvis-secret -e HTTP_PROXY={{proxy_http}} -e HTTPS_PROXY={{proxy_https}}  || echo "Erro ao criar build"
+      shell: ./oc new-app fis-java-openshift~https://bitbucket.org/elvis-redhat/tse-fuse.git --source-secret elvis-secret -e HTTP_PROXY={{proxy_http}} -e HTTPS_PROXY={{proxy_https}}  || echo "Erro ao criar build"
     #  shell: /home/{{ansible_ssh_user}}/oc new-app fis-java-openshift~https://bitbucket.org/elvis-redhat/tse-fuse.git --source-secret elvis-secret || echo "Erro ao criar build"
 
     #- name: Importando dados para o mysql
