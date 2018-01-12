@@ -96,11 +96,13 @@
       file: path=openshift-dir state=directory
 
     - name: Inicia openshift cluster-up
-      command: ./oc cluster up tse --version=v3.6.173.0.5 --public-hostname='{{ansible_default_ipv4.address}}' --use-existing-config --host-data-dir='{{pwd.stdout}}/openshift-dir' --host-pv-dir='{{pwd.stdout}}/openshift-dir'
+      command: ./oc cluster up tse --public-hostname='{{ansible_default_ipv4.address}}' --use-existing-config --host-data-dir='{{pwd.stdout}}/openshift-dir' --host-pv-dir='{{pwd.stdout}}/openshift-dir'
+      #command: ./oc cluster up tse --version=v3.6.173.0.5 --public-hostname='{{ansible_default_ipv4.address}}' --use-existing-config --host-data-dir='{{pwd.stdout}}/openshift-dir' --host-pv-dir='{{pwd.stdout}}/openshift-dir'
       when: http_proxy is undefined
 
     - name: Inicia openshift cluster-up (com proxy)
-      command: ./oc cluster up tse --version=v3.6.173.0.5 --http-proxy='{{proxy_http}}' --https-proxy='{{proxy_https}}' --public-hostname='hostvars[inventory_hostname]['ansible_default_ipv4']['address']' --use-existing-config --host-data-dir='{{pwd.stdout}}/openshift-dir' --host-pv-dir='{{pwd.stdout}}/openshift-dir'
+      command: ./oc cluster up tse --http-proxy='{{proxy_http}}' --https-proxy='{{proxy_https}}' --public-hostname='hostvars[inventory_hostname]['ansible_default_ipv4']['address']' --use-existing-config --host-data-dir='{{pwd.stdout}}/openshift-dir' --host-pv-dir='{{pwd.stdout}}/openshift-dir'
+      #command: ./oc cluster up tse --version=v3.6.173.0.5 --http-proxy='{{proxy_http}}' --https-proxy='{{proxy_https}}' --public-hostname='hostvars[inventory_hostname]['ansible_default_ipv4']['address']' --use-existing-config --host-data-dir='{{pwd.stdout}}/openshift-dir' --host-pv-dir='{{pwd.stdout}}/openshift-dir'
       when: http_proxy is defined
 
     - name: Openshift login com o usuário de sistema
