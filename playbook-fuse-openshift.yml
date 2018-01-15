@@ -27,11 +27,13 @@
     - name: Cria diretorio config do docker
       file: path=/etc/systemd/system/docker.service.d state=directory
 
-    #- name: Cria arquivo config do docker para proxy http
-    #  file: path=/etc/systemd/system/docker.service.d/http-proxy.conf state=touch
+    - name: Cria arquivo config do docker para proxy http
+      file: path=/etc/systemd/system/docker.service.d/http-proxy.conf state=touch
+      when: http_proxy is defined
 
-    #- name: Cria arquivo config do docker para proxy https
-    #  file: path=/etc/systemd/system/docker.service.d/https-proxy.conf state=touch
+    - name: Cria arquivo config do docker para proxy https
+      file: path=/etc/systemd/system/docker.service.d/https-proxy.conf state=touch
+      when: http_proxy is defined
 
     - lineinfile:
         path: /etc/sysconfig/docker
@@ -39,21 +41,28 @@
         insertafter: '^#OPTIONS'
         line: 'OPTIONS=''--insecure-registry 172.30.0.0/16 --log-driver json-file --log-opt max-size=1M --log-opt max-file=3'''
 
-    #- lineinfile:
-    #    path: /etc/systemd/system/docker.service.d/http-proxy.conf
-    #    line: '[Service]'
+    - lineinfile:
+        path: /etc/systemd/system/docker.service.d/http-proxy.conf
+        line: '[Service]'
+        when: http_proxy is defined
 
-    #- lineinfile:
-    #    path: /etc/systemd/system/docker.service.d/http-proxy.conf
-    #    line: 'Environment="HTTP_PROXY={{proxy_http}}" "NO_PROXY={{no_proxy}}"'
+    - lineinfile:
+        path: /etc/systemd/system/docker.service.d/http-proxy.conf
+        line: 'Environment="HTTP_PROXY={{proxy_http}}" "NO_PROXY={{no_proxy}}"'
+        when: http_proxy is defined
 
-    #- lineinfile:
-    #    path: /etc/systemd/system/docker.service.d/https-proxy.conf
-    #    line: '[Service]'
 
-    #- lineinfile:
-    #    path: /etc/systemd/system/docker.service.d/https-proxy.conf
-    #    line: 'Environment="HTTPS_PROXY={{proxy_https}}" "NO_PROXY={{no_proxy}}"'
+    - lineinfile:
+        path: /etc/systemd/system/docker.service.d/https-proxy.conf
+        line: '[Service]'
+        when: http_proxy is defined
+
+
+    - lineinfile:
+        path: /etc/systemd/system/docker.service.d/https-proxy.conf
+        line: 'Environment="HTTPS_PROXY={{proxy_https}}" "NO_PROXY={{no_proxy}}"'
+        when: http_proxy is defined
+
 
     - name: Restart docker
       systemd:
@@ -97,12 +106,11 @@
 
     - name: Inicia openshift cluster-up
       command: ./oc cluster up tse --public-hostname='{{ansible_default_ipv4.address}}' --use-existing-config --host-data-dir='{{pwd.stdout}}/openshift-dir' --host-pv-dir='{{pwd.stdout}}/openshift-dir'
-      #command: ./oc cluster up tse --version=v3.6.173.0.5 --public-hostname='{{ansible_default_ipv4.address}}' --use-existing-config --host-data-dir='{{pwd.stdout}}/openshift-dir' --host-pv-dir='{{pwd.stdout}}/openshift-dir'
       when: http_proxy is undefined
+      #command: ./oc cluster up tse --version=v3.6.173.0.5 --public-hostname='{{ansible_default_ipv4.address}}' --use-existing-config --host-data-dir='{{pwd.stdout}}/openshift-dir' --host-pv-dir='{{pwd.stdout}}/openshift-dir'
 
     - name: Inicia openshift cluster-up (com proxy)
       command: ./oc cluster up tse --http-proxy='{{proxy_http}}' --https-proxy='{{proxy_https}}' --public-hostname='hostvars[inventory_hostname]['ansible_default_ipv4']['address']' --use-existing-config --host-data-dir='{{pwd.stdout}}/openshift-dir' --host-pv-dir='{{pwd.stdout}}/openshift-dir'
-      #command: ./oc cluster up tse --version=v3.6.173.0.5 --http-proxy='{{proxy_http}}' --https-proxy='{{proxy_https}}' --public-hostname='hostvars[inventory_hostname]['ansible_default_ipv4']['address']' --use-existing-config --host-data-dir='{{pwd.stdout}}/openshift-dir' --host-pv-dir='{{pwd.stdout}}/openshift-dir'
       when: http_proxy is defined
 
     - name: Openshift login com o usuário de sistema
@@ -149,24 +157,22 @@
     - name: Adicionando secret
       shell: ./oc secrets add serviceaccount/builder secrets/elvis-secret || echo "Erro ao adicionar secret"
 
-    #- name: Executando build da aplicação
-    #  shell: /home/{{ansible_ssh_user}}/oc new-build fis-java-openshift~https://elvis-redhat@bitbucket.org/elvis-redhat/tse-fuse.git --build-secret elvis-secret || echo "Erro ao criar build"
+    - name: Executando build da aplicação
+      shell: ./oc new-build fis-java-openshift~https://elvis-redhat@bitbucket.org/elvis-redhat/tse-fuse.git --build-secret elvis-secret || echo "Erro ao criar build"
+      when: http_proxy is undefined
+
+    - name: Executando build da aplicação (com proxy)
+      shell: ./oc new-build fis-java-openshift~https://elvis-redhat@bitbucket.org/elvis-redhat/tse-fuse.git --build-secret elvis-secret -e HTTP_PROXY={{proxy_http}} -e HTTPS_PROXY={{proxy_https}} || echo "Erro ao criar build"
+      when: http_proxy is defined
 
     #- name: Acessando shell do container 
     # shell: /home/{{ansible_ssh_user}}/oc exec {{mysql_container.stdout}} -- /opt/rh/rh-mysql57/root/usr/bin/mysql --user=root srh2  < /tmp/mysql-dump.sql || echo "Nao iniciado"
 
-    - name: Executando build do projeto fuse 
-      shell: ./oc new-app fis-java-openshift~https://bitbucket.org/elvis-redhat/tse-fuse.git --source-secret elvis-secret -e HTTP_PROXY={{proxy_http}} -e HTTPS_PROXY={{proxy_https}}  || echo "Erro ao criar build"
+    #- name: Executando build do projeto fuse 
+    #  shell: ./oc new-app fis-java-openshift~https://bitbucket.org/elvis-redhat/tse-fuse.git --source-secret elvis-secret -e HTTP_PROXY={{proxy_http}} -e HTTPS_PROXY={{proxy_https}}  || echo "Erro ao criar build"
     #  shell: /home/{{ansible_ssh_user}}/oc new-app fis-java-openshift~https://bitbucket.org/elvis-redhat/tse-fuse.git --source-secret elvis-secret || echo "Erro ao criar build"
 
     #- name: Importando dados para o mysql
     # shell: mysql -h 127.0.0.1 -P 3306 -u root -p < 'CREATE DATABASE srh2;'
-
-    #- name: Importando 
-    # shell: /home/{{ansible_ssh_user}}/oc 
-
-    #- name: Importando 
-    # shell: /home/{{ansible_ssh_user}}/oc 
-
 
 
