@@ -116,6 +116,9 @@
     - name: Openshift login com o usuário de sistema
       shell: ./oc login https://{{ansible_default_ipv4.address}}:8443 -u system:admin
 
+    - name: Openshift permissao de system-admin no usuario admin
+      shell: ./oc adm policy add-cluster-role-to-user cluster-admin admin
+
     - name: Importando imagem Mysql
       shell: ./oc import-image my-rhscl/mysql-57-rhel7 --from=registry.access.redhat.com/rhscl/mysql-57-rhel7 --confirm -n openshift || echo "Imagem ja existe"
 
