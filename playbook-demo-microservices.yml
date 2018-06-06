@@ -1,0 +1,60 @@
+---
+- hosts: localhost
+  name: "Provisionamento Demo CoolStore Microservices"
+  #become: true
+  connection: local
+
+  vars:
+    no_proxy: localhost,127.0.0.1
+
+#  vars_prompt:
+#    - name: "proxy_http"
+#      prompt: "Digite o proxy com usuário e senha (Exemplo: http://usuario:senha@proxy.com.br)"
+#    - name: "proxy_https"
+#      prompt: "Proxy https"
+
+#  environment:
+#    http_proxy: "{{proxy_http}}"
+#    https_proxy: "{{proxy_https}}"
+
+  tasks:
+
+    - name: Verifica diretorio
+      shell: pwd
+      register: pwd
+
+    - name: Para o cluster se estiver ativo
+      command: oc cluster down demo
+      ignore_errors: yes
+
+    - name: Limpa configuracao
+      file: path=openshift-dir state=absent
+
+    - name: Cria diretorio openshift
+      file: path=openshift-dir state=directory
+
+    - name: Inicia openshift cluster-up
+      command: oc cluster up demo --public-hostname='{{ansible_default_ipv4.address}}' --use-existing-config --host-data-dir='{{pwd.stdout}}/openshift-dir' --host-pv-dir='{{pwd.stdout}}/openshift-dir' --host-config-dir='{{pwd.stdout}}/openshift-dir'
+#      when: http_proxy is undefined
+
+#    - name: Inicia openshift cluster-up (com proxy)
+#      command: oc cluster up demo --http-proxy='{{proxy_http}}' --https-proxy='{{proxy_https}}' --public-hostname='{{ansible_default_ipv4.address}}' --use-existing-config --host-data-dir='{{pwd.stdout}}/openshift-dir' --host-pv-dir='{{pwd.stdout}}/openshift-dir' --host-config-dir='{{pwd.stdout}}/openshift-dir'
+#      when: http_proxy is defined
+
+    - name: Openshift login com o usuário de sistema
+      shell: oc login https://{{ansible_default_ipv4.address}}:8443 -u system:admin
+
+    - name: Openshift permissao de system-admin no usuario admin
+      shell: oc adm policy add-cluster-role-to-user cluster-admin admin
+
+    - name: Importando imagem Jenkins
+      shell: oc import-image jenkins --from=registry.access.redhat.com/openshift3/jenkins-2-rhel7 --confirm --all -n openshift || echo "Imagem ja existe"
+
+    - name: Baixando imagem do Jenkins
+      shell: docker pull registry.access.redhat.com/openshift3/jenkins-2-rhel7
+   
+    - name: Logando com o usuario normal
+      shell: oc login https://{{ansible_default_ipv4.address}}:8443 -u developer
+
+    - name: Provisionando demo
+      shell: ./openshift/scripts/provision-demo.sh deploy msa-cicd-eap
